@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Uploader</title>
+    <title>SLAM & Co Notice Board</title>
     <style>
         * {
             margin: 0;
@@ -12,8 +12,11 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Courier New', monospace;
+            background: #1a1a2e;
+            background-image: 
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,.03) 2px, rgba(255,255,255,.03) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,.03) 2px, rgba(255,255,255,.03) 4px);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,63 +25,120 @@
         }
 
         .container {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 500px;
+            background: #0f3460;
+            border: 4px solid #16213e;
+            box-shadow: 
+                0 0 0 2px #e94560,
+                8px 8px 0 0 #16213e,
+                8px 8px 0 2px #e94560;
+            max-width: 550px;
             width: 100%;
+            padding: 0;
+        }
+
+        .header {
+            background: #e94560;
+            padding: 20px;
+            border-bottom: 4px solid #16213e;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: repeating-linear-gradient(
+                90deg,
+                #ff6b9d 0px,
+                #ff6b9d 10px,
+                #fec260 10px,
+                #fec260 20px
+            );
         }
 
         h1 {
-            font-size: 28px;
-            color: #333;
-            margin-bottom: 10px;
+            font-size: 32px;
+            color: #fff;
+            margin-bottom: 5px;
             text-align: center;
+            text-shadow: 3px 3px 0 #16213e;
+            letter-spacing: 2px;
         }
 
         .subtitle {
-            color: #666;
+            color: #fec260;
             text-align: center;
-            margin-bottom: 30px;
             font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .content {
+            padding: 30px;
         }
 
         .upload-area {
-            border: 2px dashed #667eea;
-            border-radius: 12px;
+            border: 3px dashed #e94560;
+            background: #16213e;
             padding: 40px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: #f8f9ff;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background: linear-gradient(45deg, #e94560, #fec260, #e94560);
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
 
         .upload-area:hover {
-            border-color: #764ba2;
-            background: #f0f2ff;
+            background: #1a1a2e;
+            transform: translate(-2px, -2px);
+        }
+
+        .upload-area:hover::before {
+            opacity: 0.3;
         }
 
         .upload-area.dragover {
-            border-color: #764ba2;
-            background: #e8ebff;
-            transform: scale(1.02);
+            background: #e94560;
+            border-color: #fec260;
+            transform: scale(0.98);
         }
 
         .upload-icon {
-            font-size: 48px;
+            font-size: 64px;
             margin-bottom: 15px;
+            filter: drop-shadow(2px 2px 0 #e94560);
         }
 
         .upload-text {
-            color: #667eea;
-            font-weight: 600;
-            margin-bottom: 8px;
+            color: #fec260;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0 #16213e;
         }
 
         .upload-hint {
-            color: #999;
-            font-size: 13px;
+            color: #a0a0a0;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         input[type="file"] {
@@ -86,7 +146,7 @@
         }
 
         .preview-area {
-            margin-top: 30px;
+            margin-top: 25px;
             display: none;
         }
 
@@ -94,98 +154,148 @@
             display: block;
         }
 
+        .preview-container {
+            border: 4px solid #e94560;
+            padding: 4px;
+            background: #16213e;
+            margin-bottom: 20px;
+        }
+
         .preview-image {
             width: 100%;
-            border-radius: 12px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: block;
+            border: 2px solid #0f3460;
         }
 
         .file-info {
-            background: #f8f9ff;
+            background: #16213e;
             padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+            border: 2px solid #e94560;
+            margin-bottom: 20px;
         }
 
         .file-name {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 5px;
+            font-weight: bold;
+            color: #fec260;
+            margin-bottom: 8px;
             word-break: break-all;
+            text-transform: uppercase;
+            font-size: 14px;
         }
 
         .file-size {
-            color: #666;
-            font-size: 13px;
+            color: #a0a0a0;
+            font-size: 12px;
+            text-transform: uppercase;
         }
 
         .upload-button {
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
+            padding: 16px;
+            background: #e94560;
+            color: #fff;
+            border: 3px solid #16213e;
+            font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
-            transition: transform 0.2s ease;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            box-shadow: 4px 4px 0 0 #16213e;
+            transition: all 0.1s ease;
+            position: relative;
         }
 
         .upload-button:hover {
-            transform: translateY(-2px);
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 0 #16213e;
+        }
+
+        .upload-button:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0 0 0 0 #16213e;
         }
 
         .upload-button:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
 
         .message {
-            margin-top: 15px;
-            padding: 12px;
-            border-radius: 8px;
+            margin-top: 20px;
+            padding: 15px;
+            border: 3px solid;
             text-align: center;
+            font-weight: bold;
             font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
             display: none;
         }
 
         .message.success {
-            background: #d4edda;
-            color: #155724;
-            display: block;
+            background: #16213e;
+            color: #0cff00;
+            border-color: #0cff00;
+            box-shadow: 0 0 10px rgba(12, 255, 0, 0.5);
         }
 
         .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            display: block;
+            background: #16213e;
+            color: #ff0055;
+            border-color: #ff0055;
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+        }
+
+        .scanlines {
+            pointer-events: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            z-index: 9999;
         }
     </style>
 </head>
 <body>
+    <div class="scanlines"></div>
+    
     <div class="container">
-        <h1>📸 SLAM & Co Notice Board</h1>
-        <p class="subtitle">Upload your images to the notice board</p>
-
-        <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">🖼️</div>
-            <div class="upload-text">Click to upload or drag and drop</div>
-            <div class="upload-hint">PNG, JPG, GIF up to 10MB</div>
-            <input type="file" id="fileInput" accept="image/*">
+        <div class="header">
+            <h1>◢ NOTICE BOARD ◣</h1>
+            <p class="subtitle">// SLAM & Co //</p>
         </div>
 
-        <div class="preview-area" id="previewArea">
-            <img id="previewImage" class="preview-image" alt="Preview">
-            <div class="file-info">
-                <div class="file-name" id="fileName"></div>
-                <div class="file-size" id="fileSize"></div>
+        <div class="content">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">▣</div>
+                <div class="upload-text">[ Select File ]</div>
+                <div class="upload-hint">PNG • JPG • GIF • Max 10MB</div>
+                <input type="file" id="fileInput" accept="image/*">
             </div>
-            <button class="upload-button" id="uploadButton">Upload Image</button>
-        </div>
 
-        <div class="message" id="message"></div>
+            <div class="preview-area" id="previewArea">
+                <div class="preview-container">
+                    <img id="previewImage" class="preview-image" alt="Preview">
+                </div>
+                <div class="file-info">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-size" id="fileSize"></div>
+                </div>
+                <button class="upload-button" id="uploadButton">► UPLOAD ◄</button>
+            </div>
+
+            <div class="message" id="message"></div>
+        </div>
     </div>
 
     <script>
@@ -243,8 +353,8 @@
             reader.readAsDataURL(file);
 
             // Show file info
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
+            fileName.textContent = '» ' + file.name;
+            fileSize.textContent = '» ' + formatFileSize(file.size);
             
             // Hide any previous messages
             message.style.display = 'none';
@@ -262,7 +372,7 @@
             if (!selectedFile) return;
 
             uploadButton.disabled = true;
-            uploadButton.textContent = 'Uploading...';
+            uploadButton.textContent = '► UPLOADING... ◄';
 
             const formData = new FormData();
             formData.append('image', selectedFile);
@@ -274,28 +384,27 @@
                 });
 
                 if (response.ok) {
-                    showMessage('Image uploaded successfully!', 'success');
-                    // Reset after 2 seconds
-                    setTimeout(() => {
-                        previewArea.classList.remove('active');
-                        fileInput.value = '';
-                        selectedFile = null;
-                        message.style.display = 'none';
-                    }, 2000);
+                    const result = await response.text();
+                    showMessage('[ SUCCESS ] ' + selectedFile.name + ' uploaded to the notice board, keep an eye out for your notice on the TV!', 'success');
+                    uploadButton.style.opacity = '0.5';
+                    uploadButton.style.cursor = 'not-allowed';
+                    uploadButton.textContent = '✓ UPLOADED';
                 } else {
-                    showMessage('Upload failed. Please try again.', 'error');
+                    showMessage('[ ERROR ] Upload failed! Please contact pi owner if this continues to happen.', 'error');
+                    uploadButton.disabled = false;
+                    uploadButton.textContent = '► UPLOAD ◄';
                 }
             } catch (error) {
-                showMessage('Error: ' + error.message, 'error');
-            } finally {
+                showMessage('[ ERROR ] ' + error.message, 'error');
                 uploadButton.disabled = false;
-                uploadButton.textContent = 'Upload Image';
+                uploadButton.textContent = '► UPLOAD ◄';
             }
         });
 
         function showMessage(text, type) {
             message.textContent = text;
             message.className = 'message ' + type;
+            message.style.display = 'block';
         }
     </script>
 </body>

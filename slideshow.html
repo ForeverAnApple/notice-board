@@ -79,7 +79,7 @@
             height: 6px;
             background: #fec260;
             width: 0%;
-            animation: progress 20s linear infinite;
+            animation: progress 10s linear infinite;
             z-index: 100;
             box-shadow: 0 0 10px rgba(254, 194, 96, 0.8);
         }
@@ -120,7 +120,7 @@
                 images.forEach((image, index) => {
                     const slide = document.createElement('div');
                     slide.className = 'slide' + (index === 0 ? ' active' : '');
-                    slide.innerHTML = `<img src="/pictures/${image}" alt="${image}">`;
+                    slide.innerHTML = `<img src="/pictures/${encodeURIComponent(image)}" alt="${image}">`;
                     container.appendChild(slide);
                 });
 
@@ -192,7 +192,7 @@
                     images.forEach((image, index) => {
                         const slide = document.createElement('div');
                         slide.className = 'slide' + (index === currentSlide ? ' active' : '');
-                        slide.innerHTML = `<img src="/pictures/${image}" alt="${image}">`;
+                        slide.innerHTML = `<img src="/pictures/${encodeURIComponent(image)}" alt="${image}">`;
                         container.appendChild(slide);
                     });
                     
@@ -205,8 +205,8 @@
         }
 
         function startSlideshow() {
-            // Change slide every 20 seconds
-            slideInterval = setInterval(nextSlide, 20000);
+            // Change slide every 10 seconds
+            slideInterval = setInterval(nextSlide, 10000);
         }
 
         function stopSlideshow() {

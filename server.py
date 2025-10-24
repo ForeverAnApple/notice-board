@@ -4,6 +4,29 @@ import os
 import json
 import mimetypes
 
+def url_decode(s):
+    """Decode URL-encoded string manually"""
+    result = []
+    i = 0
+    while i < len(s):
+        if s[i] == '%' and i + 2 < len(s):
+            try:
+                # Convert %XX to character
+                hex_chars = s[i+1:i+3]
+                char = chr(int(hex_chars, 16))
+                result.append(char)
+                i += 3
+            except ValueError:
+                result.append(s[i])
+                i += 1
+        elif s[i] == '+':
+            result.append(' ')
+            i += 1
+        else:
+            result.append(s[i])
+            i += 1
+    return ''.join(result)
+
 class UploadHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
@@ -52,11 +75,11 @@ class UploadHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps([]).encode())
         
         elif self.path.startswith('/pictures/'):
-            # Serve images from pictures folder
-            filepath = self.path[1:]  # Remove leading slash
-            if os.path.exists(filepath) and os.path.isfile(filepath):
-                mime_type, _ = mimetypes.guess_type(filepath)
-                with open(filepath, 'rb') as f:
+            # Decode URL-encoded path (handles spaces and special characters)
+            decoded_path = url_decode(self.path[1:])  # Remove leading slash and decode
+            if os.path.exists(decoded_path) and os.path.isfile(decoded_path):
+                mime_type, _ = mimetypes.guess_type(decoded_path)
+                with open(decoded_path, 'rb') as f:
                     self.send_response(200)
                     self.send_header('Content-type', mime_type or 'application/octet-stream')
                     self.end_headers()
@@ -138,9 +161,12 @@ class UploadHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'No file uploaded')
 
 if __name__ == '__main__':
-    print('Server running on http://localhost:8080')
-    print('Upload images: http://localhost:8080/')
-    print('View slideshow: http://localhost:8080/slideshow')
+    # Get port from environment variable, default to 8080
+    port = int(os.environ.get('PORT', 8080))
+    
+    print(f'Server running on http://localhost:{port}')
+    print(f'Upload images: http://localhost:{port}/')
+    print(f'View slideshow: http://localhost:{port}/slideshow')
     print('Pictures folder: ./pictures/')
     print('Press Ctrl+C to stop')
-    HTTPServer(('', 8080), UploadHandler).serve_forever()
+    HTTPServer(('', port), UploadHandler).serve_forever()

@@ -389,6 +389,9 @@
                     uploadButton.style.opacity = '0.5';
                     uploadButton.style.cursor = 'not-allowed';
                     uploadButton.textContent = '✓ UPLOADED';
+
+		    // Hide upload area
+                    uploadArea.style.display = 'none';
                 } else {
                     showMessage('[ ERROR ] Upload failed! Please contact pi owner if this continues to happen.', 'error');
                     uploadButton.disabled = false;

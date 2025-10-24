@@ -171,10 +171,17 @@
                 // Check if images list has changed
                 if (JSON.stringify(newImages) !== JSON.stringify(images)) {
                     console.log('Images changed, reloading...');
+                    
+                    // Check if there are new images (list grew)
+                    const hasNewImages = newImages.length > images.length;
+                    
                     images = newImages;
                     
-                    // If current slide is beyond the new list, reset to first
-                    if (currentSlide >= images.length) {
+                    // If new images were added, show the first (newest) one
+                    if (hasNewImages) {
+                        currentSlide = 0;
+                    } else if (currentSlide >= images.length) {
+                        // If current slide is beyond the new list, reset to first
                         currentSlide = 0;
                     }
                     

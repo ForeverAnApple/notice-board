@@ -4,6 +4,12 @@ import os
 import json
 import mimetypes
 
+# Security settings
+MAX_FILE_SIZE = 15 * 1024 * 1024  # 10MB
+ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+PICTURES_DIR = 'pictures'
+MAX_FILENAME_LENGTH = 255
+
 def url_decode(s):
     """Decode URL-encoded string manually"""
     result = []
@@ -27,24 +33,62 @@ def url_decode(s):
             i += 1
     return ''.join(result)
 
+def sanitize_filename(filename):
+    """Sanitize filename to prevent directory traversal and other attacks"""
+    # Remove any path components
+    filename = os.path.basename(filename)
+    
+    # Remove null bytes
+    filename = filename.replace('\x00', '')
+    
+    # Remove leading dots and spaces
+    filename = filename.lstrip('. ')
+    
+    # If filename is empty after sanitization, use default
+    if not filename:
+        filename = 'upload.jpg'
+    
+    # Limit length
+    if len(filename) > MAX_FILENAME_LENGTH:
+        name, ext = os.path.splitext(filename)
+        filename = name[:MAX_FILENAME_LENGTH - len(ext)] + ext
+    
+    return filename
+
+def is_allowed_file(filename):
+    """Check if file extension is allowed"""
+    ext = os.path.splitext(filename.lower())[1]
+    return ext in ALLOWED_EXTENSIONS
+
+def is_safe_path(basedir, path):
+    """Ensure the path doesn't escape the base directory"""
+    basedir = os.path.abspath(basedir)
+    path = os.path.abspath(path)
+    return path.startswith(basedir)
+
 class UploadHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
-            with open('index.html', 'rb') as f:
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(f.read())
+            if os.path.exists('index.html'):
+                with open('index.html', 'rb') as f:
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404)
         
         elif self.path == '/slideshow':
-            with open('slideshow.html', 'rb') as f:
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(f.read())
+            if os.path.exists('slideshow.html'):
+                with open('slideshow.html', 'rb') as f:
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404)
         
         elif self.path == '/favicon.ico':
-            # Check if favicon.ico exists, otherwise return empty response
             if os.path.exists('favicon.ico'):
                 with open('favicon.ico', 'rb') as f:
                     self.send_response(200)
@@ -52,22 +96,24 @@ class UploadHandler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(f.read())
             else:
-                # Return a 204 No Content if favicon doesn't exist
                 self.send_response(204)
                 self.end_headers()
         
         elif self.path == '/api/images':
-            # Return list of images in pictures folder
-            pictures_dir = 'pictures'
-            if os.path.exists(pictures_dir):
-                images = [f for f in os.listdir(pictures_dir) 
-                         if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
-                images.sort()  # Sort alphabetically
-                
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(images).encode())
+            if os.path.exists(PICTURES_DIR):
+                try:
+                    images = [f for f in os.listdir(PICTURES_DIR) 
+                             if os.path.isfile(os.path.join(PICTURES_DIR, f)) and
+                             f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
+                    images.sort()
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(images).encode())
+                except Exception as e:
+                    print(f"Error listing images: {e}")
+                    self.send_error(500)
             else:
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -75,15 +121,32 @@ class UploadHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps([]).encode())
         
         elif self.path.startswith('/pictures/'):
-            # Decode URL-encoded path (handles spaces and special characters)
-            decoded_path = url_decode(self.path[1:])  # Remove leading slash and decode
-            if os.path.exists(decoded_path) and os.path.isfile(decoded_path):
-                mime_type, _ = mimetypes.guess_type(decoded_path)
-                with open(decoded_path, 'rb') as f:
-                    self.send_response(200)
-                    self.send_header('Content-type', mime_type or 'application/octet-stream')
-                    self.end_headers()
-                    self.wfile.write(f.read())
+            decoded_path = url_decode(self.path[1:])
+            full_path = os.path.abspath(decoded_path)
+            
+            # Security: Ensure path doesn't escape pictures directory
+            if not is_safe_path(PICTURES_DIR, full_path):
+                self.send_error(403, 'Forbidden')
+                return
+            
+            if os.path.exists(full_path) and os.path.isfile(full_path):
+                # Only serve allowed file types
+                if not is_allowed_file(full_path):
+                    self.send_error(403, 'Forbidden file type')
+                    return
+                
+                mime_type, _ = mimetypes.guess_type(full_path)
+                try:
+                    with open(full_path, 'rb') as f:
+                        self.send_response(200)
+                        self.send_header('Content-type', mime_type or 'application/octet-stream')
+                        # Prevent browser from executing files
+                        self.send_header('X-Content-Type-Options', 'nosniff')
+                        self.end_headers()
+                        self.wfile.write(f.read())
+                except Exception as e:
+                    print(f"Error serving file: {e}")
+                    self.send_error(500)
             else:
                 self.send_error(404)
         
@@ -93,19 +156,40 @@ class UploadHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == '/upload':
             # Create pictures directory if it doesn't exist
-            os.makedirs('pictures', exist_ok=True)
+            os.makedirs(PICTURES_DIR, exist_ok=True)
             
             content_type = self.headers.get('Content-Type', '')
             if 'multipart/form-data' not in content_type:
                 self.send_error(400, 'Invalid content type')
                 return
             
+            # Check content length
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > MAX_FILE_SIZE:
+                self.send_response(413)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(b'File too large. Maximum size is 10MB.')
+                return
+            
+            if content_length == 0:
+                self.send_error(400, 'No content')
+                return
+            
             # Extract boundary
-            boundary = content_type.split('boundary=')[1].strip()
+            try:
+                boundary = content_type.split('boundary=')[1].strip()
+            except IndexError:
+                self.send_error(400, 'Invalid multipart boundary')
+                return
             
             # Read the body
-            content_length = int(self.headers['Content-Length'])
-            body = self.rfile.read(content_length)
+            try:
+                body = self.rfile.read(content_length)
+            except Exception as e:
+                print(f"Error reading request body: {e}")
+                self.send_error(400, 'Error reading request')
+                return
             
             # Parse multipart data
             parts = body.split(f'--{boundary}'.encode())
@@ -124,35 +208,71 @@ class UploadHandler(BaseHTTPRequestHandler):
                     if file_data.endswith(b'\r\n'):
                         file_data = file_data[:-2]
                     
-                    # Extract original filename
+                    # Validate file size
+                    if len(file_data) > MAX_FILE_SIZE:
+                        self.send_response(413)
+                        self.send_header('Content-type', 'text/plain')
+                        self.end_headers()
+                        self.wfile.write(b'File too large')
+                        return
+                    
+                    if len(file_data) == 0:
+                        self.send_error(400, 'Empty file')
+                        return
+                    
+                    # Extract and sanitize filename
                     filename = 'uploaded_image.jpg'
                     for line in headers.split('\n'):
                         if 'filename=' in line:
                             filename = line.split('filename=')[1].strip().strip('"')
                             break
                     
-                    # Save with original filename
-                    filepath = os.path.join('pictures', filename)
+                    filename = sanitize_filename(filename)
+                    
+                    # Check file extension
+                    if not is_allowed_file(filename):
+                        self.send_response(400)
+                        self.send_header('Content-type', 'text/plain')
+                        self.end_headers()
+                        self.wfile.write(b'Invalid file type. Only images are allowed.')
+                        return
+                    
+                    # Save with sanitized filename
+                    filepath = os.path.join(PICTURES_DIR, filename)
+                    
+                    # Ensure the final path is safe
+                    if not is_safe_path(PICTURES_DIR, filepath):
+                        self.send_error(403, 'Invalid file path')
+                        return
                     
                     # Handle duplicate filenames
                     base, ext = os.path.splitext(filename)
                     counter = 1
                     while os.path.exists(filepath):
-                        filepath = os.path.join('pictures', f'{base}_{counter}{ext}')
+                        filepath = os.path.join(PICTURES_DIR, f'{base}_{counter}{ext}')
                         counter += 1
+                        # Safety check
+                        if counter > 10000:
+                            self.send_error(500, 'Too many duplicate files')
+                            return
                     
-                    with open(filepath, 'wb') as f:
-                        f.write(file_data)
-                    
-                    print(f'Saved: {filepath}')
-                    
-                    # Send proper response
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/plain')
-                    self.send_header('Content-Length', str(len(b'Upload successful')))
-                    self.end_headers()
-                    self.wfile.write(b'Upload successful')
-                    return
+                    try:
+                        with open(filepath, 'wb') as f:
+                            f.write(file_data)
+                        
+                        print(f'Saved: {filepath} ({len(file_data)} bytes)')
+                        
+                        # Send proper response
+                        self.send_response(200)
+                        self.send_header('Content-type', 'text/plain')
+                        self.send_header('Content-Length', str(len(b'Upload successful')))
+                        self.end_headers()
+                        self.wfile.write(b'Upload successful')
+                        return
+                    except Exception as e:
+                        print(f"Error saving file: {e}")
+                        self.send_error(500, 'Error saving file')
+                        return
             
             # If we got here, no file was found
             self.send_response(400)
@@ -167,6 +287,7 @@ if __name__ == '__main__':
     print(f'Server running on http://localhost:{port}')
     print(f'Upload images: http://localhost:{port}/')
     print(f'View slideshow: http://localhost:{port}/slideshow')
-    print('Pictures folder: ./pictures/')
+    print(f'Pictures folder: ./{PICTURES_DIR}/')
+    print(f'Max file size: {MAX_FILE_SIZE / 1024 / 1024}MB')
     print('Press Ctrl+C to stop')
     HTTPServer(('', port), UploadHandler).serve_forever()

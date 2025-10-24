@@ -5,7 +5,7 @@ import json
 import mimetypes
 
 # Security settings
-MAX_FILE_SIZE = 15 * 1024 * 1024  # 10MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
 PICTURES_DIR = 'pictures'
 MAX_FILENAME_LENGTH = 255
@@ -81,6 +81,16 @@ class UploadHandler(BaseHTTPRequestHandler):
         elif self.path == '/slideshow':
             if os.path.exists('slideshow.html'):
                 with open('slideshow.html', 'rb') as f:
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404)
+        
+        elif self.path == '/admin':
+            if os.path.exists('admin.html'):
+                with open('admin.html', 'rb') as f:
                     self.send_response(200)
                     self.send_header('Content-type', 'text/html')
                     self.end_headers()
@@ -279,6 +289,49 @@ class UploadHandler(BaseHTTPRequestHandler):
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
             self.wfile.write(b'No file uploaded')
+        
+        elif self.path == '/api/delete':
+            # Read JSON body
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length == 0:
+                self.send_error(400, 'No content')
+                return
+            
+            try:
+                body = self.rfile.read(content_length)
+                data = json.loads(body.decode('utf-8'))
+                filename = data.get('filename', '')
+                
+                if not filename:
+                    self.send_error(400, 'No filename provided')
+                    return
+                
+                # Sanitize filename
+                filename = sanitize_filename(filename)
+                filepath = os.path.join(PICTURES_DIR, filename)
+                
+                # Security check
+                if not is_safe_path(PICTURES_DIR, filepath):
+                    self.send_error(403, 'Invalid file path')
+                    return
+                
+                # Delete file
+                if os.path.exists(filepath) and os.path.isfile(filepath):
+                    os.remove(filepath)
+                    print(f'Deleted: {filepath}')
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'success': True}).encode())
+                else:
+                    self.send_error(404, 'File not found')
+                    
+            except json.JSONDecodeError:
+                self.send_error(400, 'Invalid JSON')
+            except Exception as e:
+                print(f"Error deleting file: {e}")
+                self.send_error(500, 'Error deleting file')
 
 if __name__ == '__main__':
     # Get port from environment variable, default to 8080
@@ -287,6 +340,7 @@ if __name__ == '__main__':
     print(f'Server running on http://localhost:{port}')
     print(f'Upload images: http://localhost:{port}/')
     print(f'View slideshow: http://localhost:{port}/slideshow')
+    print(f'Admin panel: http://localhost:{port}/admin')
     print(f'Pictures folder: ./{PICTURES_DIR}/')
     print(f'Max file size: {MAX_FILE_SIZE / 1024 / 1024}MB')
     print('Press Ctrl+C to stop')

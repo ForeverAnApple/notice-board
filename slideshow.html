@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLAM & Co Notice Slideshow</title>
+    <title>SLAM & Co Notice Board Slideshow</title>
     <style>
         * {
             margin: 0;
@@ -159,8 +159,6 @@
         function nextSlide() {
             currentSlide++;
             showSlide(currentSlide);
-            // Check for new/removed images
-            checkForImageUpdates();
         }
 
         async function checkForImageUpdates() {
@@ -174,11 +172,12 @@
                     
                     // Check if there are new images (list grew)
                     const hasNewImages = newImages.length > images.length;
+                    const wasEmpty = images.length === 0;
                     
                     images = newImages;
                     
                     // If new images were added, show the first (newest) one
-                    if (hasNewImages) {
+                    if (hasNewImages || wasEmpty) {
                         currentSlide = 0;
                     } else if (currentSlide >= images.length) {
                         // If current slide is beyond the new list, reset to first
@@ -205,6 +204,11 @@
                     
                     document.getElementById('imageInfo').style.display = 'block';
                     updateImageInfo();
+                    
+                    // Restart slideshow if it was empty before
+                    if (wasEmpty && images.length > 0) {
+                        startSlideshow();
+                    }
                 }
             } catch (error) {
                 console.error('Error checking for image updates:', error);
@@ -245,6 +249,11 @@
 
         // Load images on page load
         loadImages();
+        
+        // Constantly check for image updates every 5 seconds
+        setInterval(async () => {
+            await checkForImageUpdates();
+        }, 5000);
     </script>
 </body>
 </html>

@@ -66,6 +66,28 @@ def is_safe_path(basedir, path):
     path = os.path.abspath(path)
     return path.startswith(basedir)
 
+def get_images_by_time():
+    """Get list of images sorted by modification time (newest first)"""
+    if not os.path.exists(PICTURES_DIR):
+        return []
+    
+    try:
+        images = []
+        for f in os.listdir(PICTURES_DIR):
+            filepath = os.path.join(PICTURES_DIR, f)
+            if os.path.isfile(filepath) and f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                mtime = os.path.getmtime(filepath)
+                images.append((f, mtime))
+        
+        # Sort by modification time, newest first
+        images.sort(key=lambda x: x[1], reverse=True)
+        
+        # Return just the filenames
+        return [img[0] for img in images]
+    except Exception as e:
+        print(f"Error getting images by time: {e}")
+        return []
+
 class UploadHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
@@ -110,25 +132,15 @@ class UploadHandler(BaseHTTPRequestHandler):
                 self.end_headers()
         
         elif self.path == '/api/images':
-            if os.path.exists(PICTURES_DIR):
-                try:
-                    images = [f for f in os.listdir(PICTURES_DIR) 
-                             if os.path.isfile(os.path.join(PICTURES_DIR, f)) and
-                             f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))]
-                    images.sort()
-                    
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps(images).encode())
-                except Exception as e:
-                    print(f"Error listing images: {e}")
-                    self.send_error(500)
-            else:
+            try:
+                images = get_images_by_time()
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps([]).encode())
+                self.wfile.write(json.dumps(images).encode())
+            except Exception as e:
+                print(f"Error listing images: {e}")
+                self.send_error(500)
         
         elif self.path.startswith('/pictures/'):
             decoded_path = url_decode(self.path[1:])

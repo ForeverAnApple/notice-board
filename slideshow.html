@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLAM & Co Notice Slideshow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .slideshow-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .slide {
+            display: none;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        .slide img {
+            width: 100vw;
+            height: 100vh;
+            object-fit: contain;
+        }
+
+        .image-info {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            background: rgba(15, 52, 96, 0.95);
+            color: #fec260;
+            padding: 8px 16px;
+            border: 2px solid #e94560;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 3px 3px 0 0 rgba(22, 33, 62, 0.8);
+            z-index: 10;
+        }
+
+        .no-images {
+            text-align: center;
+            color: #fec260;
+            font-size: 32px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            padding: 40px;
+            border: 4px solid #e94560;
+            background: #0f3460;
+        }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: #fec260;
+            width: 0%;
+            animation: progress 20s linear infinite;
+            z-index: 100;
+            box-shadow: 0 0 10px rgba(254, 194, 96, 0.8);
+        }
+
+        @keyframes progress {
+            from { width: 0%; }
+            to { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="slideshow-container" id="slideshowContainer">
+        <div class="no-images">[ LOADING... ]</div>
+    </div>
+
+    <div class="image-info" id="imageInfo" style="display: none;"></div>
+    <div class="progress-bar"></div>
+
+    <script>
+        let currentSlide = 0;
+        let images = [];
+        let slideInterval;
+
+        async function loadImages() {
+            try {
+                const response = await fetch('/api/images');
+                images = await response.json();
+                
+                const container = document.getElementById('slideshowContainer');
+                container.innerHTML = '';
+
+                if (images.length === 0) {
+                    container.innerHTML = '<div class="no-images">[ NO IMAGES FOUND ]<br><br>Upload some images first!</div>';
+                    return;
+                }
+
+                // Create slides
+                images.forEach((image, index) => {
+                    const slide = document.createElement('div');
+                    slide.className = 'slide' + (index === 0 ? ' active' : '');
+                    slide.innerHTML = `<img src="/pictures/${image}" alt="${image}">`;
+                    container.appendChild(slide);
+                });
+
+                // Show info and start slideshow
+                updateImageInfo();
+                document.getElementById('imageInfo').style.display = 'block';
+                startSlideshow();
+            } catch (error) {
+                console.error('Error loading images:', error);
+                document.getElementById('slideshowContainer').innerHTML = 
+                    '<div class="no-images">[ ERROR LOADING IMAGES ]</div>';
+            }
+        }
+
+        function updateImageInfo() {
+            const info = document.getElementById('imageInfo');
+            info.textContent = `[${currentSlide + 1}/${images.length}]`;
+        }
+
+        function showSlide(index) {
+            const slides = document.querySelectorAll('.slide');
+            if (slides.length === 0) return;
+
+            // Remove active class from all slides
+            slides.forEach(slide => slide.classList.remove('active'));
+            
+            // Wrap around
+            if (index >= slides.length) currentSlide = 0;
+            if (index < 0) currentSlide = slides.length - 1;
+            
+            // Show current slide
+            slides[currentSlide].classList.add('active');
+            updateImageInfo();
+        }
+
+        function nextSlide() {
+            currentSlide++;
+            showSlide(currentSlide);
+            // Check for new/removed images
+            checkForImageUpdates();
+        }
+
+        async function checkForImageUpdates() {
+            try {
+                const response = await fetch('/api/images');
+                const newImages = await response.json();
+                
+                // Check if images list has changed
+                if (JSON.stringify(newImages) !== JSON.stringify(images)) {
+                    console.log('Images changed, reloading...');
+                    images = newImages;
+                    
+                    // If current slide is beyond the new list, reset to first
+                    if (currentSlide >= images.length) {
+                        currentSlide = 0;
+                    }
+                    
+                    // Rebuild slides
+                    const container = document.getElementById('slideshowContainer');
+                    container.innerHTML = '';
+                    
+                    if (images.length === 0) {
+                        container.innerHTML = '<div class="no-images">[ NO IMAGES FOUND ]<br><br>Upload some images first!</div>';
+                        document.getElementById('imageInfo').style.display = 'none';
+                        stopSlideshow();
+                        return;
+                    }
+                    
+                    images.forEach((image, index) => {
+                        const slide = document.createElement('div');
+                        slide.className = 'slide' + (index === currentSlide ? ' active' : '');
+                        slide.innerHTML = `<img src="/pictures/${image}" alt="${image}">`;
+                        container.appendChild(slide);
+                    });
+                    
+                    document.getElementById('imageInfo').style.display = 'block';
+                    updateImageInfo();
+                }
+            } catch (error) {
+                console.error('Error checking for image updates:', error);
+            }
+        }
+
+        function startSlideshow() {
+            // Change slide every 20 seconds
+            slideInterval = setInterval(nextSlide, 20000);
+        }
+
+        function stopSlideshow() {
+            if (slideInterval) {
+                clearInterval(slideInterval);
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                stopSlideshow();
+                nextSlide();
+                startSlideshow();
+            } else if (e.key === 'ArrowLeft') {
+                stopSlideshow();
+                currentSlide--;
+                showSlide(currentSlide);
+                startSlideshow();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                if (slideInterval) {
+                    stopSlideshow();
+                } else {
+                    startSlideshow();
+                }
+            }
+        });
+
+        // Load images on page load
+        loadImages();
+    </script>
+</body>
+</html>
